@@ -320,7 +320,7 @@ package axi_dma_controller_dv_pkg;
         local task automatic drive_resp_pkt(input item_t item);
             // int rvalid_delay;
             bit [DATA_WD-1:0] resp_data;
-            int narrow_offset = item.address & ((ADDR_WD / 8 - 1) + 1 - (1 << item.size));
+            int narrow_offset = (item.address % (ADDR_WD / 8)) & ((1 << item.size) - 1);
             int data_offset = item.data_offset;
             int ret_offset;
             // $info("item.trans = ", item.trans);
@@ -339,6 +339,8 @@ package axi_dma_controller_dv_pkg;
                     resp_data[(ret_offset + j)*8+:8] = item.data[data_offset];
                     data_offset++;
                 end
+
+                narrow_offset = (narrow_offset + (1 << item.size)) % (ADDR_WD / 8);
 
                 axi_if.rvalid <= 1;
                 axi_if.rdata  <= resp_data;

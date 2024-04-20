@@ -53,7 +53,8 @@ module dmac_write_initiator # (
     wire aw_fire_last = m_axi_awvalid && m_axi_awready;
     wire w_fire_last  = m_axi_wvalid && m_axi_wready && m_axi_wlast;
 
-    wire [ADDR_WD-1:0] aligned_len_bytes = (1 << BURST_BITS) - wr_req_addr[BURST_BITS-1:0];
+    // Align to MAX_BURST_LEN * (2 ** size) bytes
+    wire [ADDR_WD-1:0] aligned_len_bytes = (1 << ($clog2(MAX_BURST_LEN) + wr_req_size)) - (wr_req_addr & ((1 << ($clog2(MAX_BURST_LEN) + wr_req_size)) - 1));
     wire [ADDR_WD-1:0] burst_len_bytes = aligned_len_bytes > wr_req_length ? wr_req_length : aligned_len_bytes;
 
     wire [ADDR_WD-1:0] aligned_req_addr = wr_req_addr & ~((1 << wr_req_size) - 1);

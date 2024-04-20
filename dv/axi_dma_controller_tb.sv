@@ -127,6 +127,14 @@ module axi_dma_controller_tb # (
         );
     endtask : send_aligned_cmd
 
+    task automatic test_demo();
+        repeat (20) begin
+            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 5);
+            repeat ($urandom_range(0, $urandom_range(0, 9) > 8 ? 60 : 0)) @(posedge clk);
+        end
+        #20ns;
+    endtask : test_demo
+
     task automatic test_aligned();
         repeat (10) send_aligned_cmd(MAX_BURST_LEN);
         repeat (20) begin
@@ -156,10 +164,69 @@ module axi_dma_controller_tb # (
         repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
     endtask : test_aligned_throttling
 
+    task automatic send_narrow_cmd(input int max_size);
+        int src_addr;
+        int dst_addr;
+        int len;
+        int size;
+        void'(std::randomize(src_addr, dst_addr, len) with {
+            0 <= size && size < $clog2(ADDR_WD_BYTES);
+            src_addr % (1 << size) == 0;
+            dst_addr % (1 << size) == 0;
+            len > 0 && len < max_size && len % (1 << size) == 0;
+        });
+        cmd_if_drv.start_dma (
+            .src_addr(src_addr),
+            .dst_addr(dst_addr),
+            .burst(axi4_pkg::INCR),
+            .len(len),
+            .size(size)
+        );
+    endtask : send_narrow_cmd
+
+    task automatic test_narrow();
+        // repeat (10) send_narrow_cmd(MAX_BURST_LEN);
+        // repeat (20) begin
+        //     send_narrow_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
+        //     repeat ($urandom_range(10, 60)) @(posedge clk);
+        // end
+        repeat (20) send_narrow_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
+    endtask : test_narrow
+
+    task automatic send_unaligned_cmd(input int max_size);
+        int src_addr;
+        int dst_addr;
+        int len;
+        void'(std::randomize(src_addr, dst_addr, len) with {
+            len > 0 && len < max_size
+                && len % ADDR_WD_BYTES == 0; // FIXME
+        });
+        cmd_if_drv.start_dma (
+            .src_addr(src_addr),
+            .dst_addr(dst_addr),
+            .burst(axi4_pkg::INCR),
+            .len(len),
+            .size($clog2(ADDR_WD_BYTES))
+        );
+    endtask : send_unaligned_cmd
+
+    task automatic test_unaligned();
+        repeat (10) send_unaligned_cmd(MAX_BURST_LEN);
+        repeat (20) begin
+            send_unaligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
+            repeat ($urandom_range(10, 60)) @(posedge clk);
+        end
+        repeat (20) send_unaligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+    endtask : test_unaligned
+
     initial begin
         @(posedge clk iff !rst);
+        // TODO: 
+        test_demo();
         // test_aligned();
-        test_aligned_throttling();
+        // test_aligned_throttling();
+        // test_narrow();
+        // test_unaligned();
         // TODO: wait write request and check scoreboard
         $finish;
     end

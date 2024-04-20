@@ -20,11 +20,6 @@ module dmac_read_initiator # (
     output [ADDR_WD-1:0]                rd_req_next_length,
     output                              rd_req_done,
 
-    // output                              ctrl_out_valid,
-    // output [ADDR_WD-1:0]                ctrl_out_dst_addr,
-    // output [$clog2(ADDR_WD)-1:0]        ctrl_out_rd_offset,
-    // output [ADDR_WD-1:0]                ctrl_out_length, // bytes
-
     // Read Address Channel
     output logic                        m_axi_arvalid,
     input                               m_axi_arready,
@@ -34,16 +29,11 @@ module dmac_read_initiator # (
     output logic [1:0]                  m_axi_arburst
 );
 
-    localparam MAX_BURST_BYTES = MAX_BURST_LEN * (ADDR_WD / 8);
-    localparam BURST_BITS = $clog2(MAX_BURST_BYTES);
-
     assign rd_req_ack = m_axi_arvalid && m_axi_arready;
     assign rd_req_done = rd_req_next_length == 0;
 
-    // assign m_axi_arvalid = 0;
-    // assign m_axi_araddr = 0;
-    // assign m_axi_arlen = 0;
-    wire [ADDR_WD-1:0] aligned_len_bytes = (1 << BURST_BITS) - rd_req_addr[BURST_BITS-1:0];
+    // Align to MAX_BURST_LEN * (2 ** size) bytes
+    wire [ADDR_WD-1:0] aligned_len_bytes = (1 << ($clog2(MAX_BURST_LEN) + rd_req_size)) - (rd_req_addr & ((1 << ($clog2(MAX_BURST_LEN) + rd_req_size)) - 1));
     wire [ADDR_WD-1:0] burst_len_bytes = aligned_len_bytes > rd_req_length ? rd_req_length : aligned_len_bytes;
 
     wire [ADDR_WD-1:0] aligned_req_addr = rd_req_addr & ~((1 << rd_req_size) - 1);
