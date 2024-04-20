@@ -22,14 +22,14 @@ module dmac_channel_ctrl # (
     input [2:0]                         cmd_size,
 
     // input                               buf_burst_ready,
-    input [$clog2(MAX_BURST_LEN):0]     buf_fill_level,
+    input [$clog2(MAX_BURST_LEN)+1:0]   buf_usage,
   
     output                              rd_req_valid,
+    input                               rd_req_ack,
     output [ADDR_WD-1:0]                rd_req_addr,
     output [axi4_pkg::BURST_BITS-1:0]   rd_req_burst,
     output [ADDR_WD-1:0]                rd_req_length,
     output [axi4_pkg::SIZE_BITS-1:0]    rd_req_size,
-    input                               rd_req_ack,
     input  [ADDR_WD-1:0]                rd_req_next_addr,
     input  [ADDR_WD-1:0]                rd_req_next_length,
     input                               rd_req_done,
@@ -38,12 +38,12 @@ module dmac_channel_ctrl # (
 
     // input    wr_channel_sel
     output logic                        wr_req_valid,
+    input                               wr_req_ack,
     output [ADDR_WD-1:0]                wr_req_addr,
     output [axi4_pkg::BURST_BITS-1:0]   wr_req_burst,
     output [ADDR_WD-1:0]                wr_req_length,
-    output [$clog2(ADDR_WD)-1:0]        wr_req_data_offset, // src_addr % ADDR_WD_BYTES
+    output [$clog2(ADDR_WD/8)-1:0]      wr_req_data_offset, // src_addr % ADDR_WD_BYTES
     output [axi4_pkg::SIZE_BITS-1:0]    wr_req_size,
-    input                               wr_req_ack,
     input  [ADDR_WD-1:0]                wr_req_next_addr,
     input  [ADDR_WD-1:0]                wr_req_next_length,
     input                               wr_req_done
@@ -65,7 +65,8 @@ module dmac_channel_ctrl # (
     logic               channel_wr_req_done;
 
 
-    wire allocate_channel = !channel_active && cmd_valid;
+    // wire allocate_channel = !channel_active && cmd_valid;
+    wire allocate_channel = cmd_valid && cmd_ready;
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -91,7 +92,7 @@ module dmac_channel_ctrl # (
         if (rst) begin
             cmd_ready <= 0;
         end else begin
-            if (cmd_valid)
+            if (cmd_valid && cmd_ready)
                 cmd_ready <= 0;
             else
             if (!channel_active)
@@ -132,10 +133,12 @@ module dmac_channel_ctrl # (
         if (rst) begin
             channel_rd_outstanding_ctr <= 0;
         end else begin
-            if ((rd_req_valid && rd_req_ack) && !rd_resp_valid) begin
-                channel_rd_outstanding_ctr <= channel_rd_outstanding_ctr + 1;
-            end else if (rd_resp_valid) begin
-                channel_rd_outstanding_ctr <= channel_rd_outstanding_ctr - 1;
+            if ((rd_req_valid && rd_req_ack) != rd_resp_valid) begin
+                if (rd_resp_valid) begin
+                    channel_rd_outstanding_ctr <= channel_rd_outstanding_ctr - 1;
+                end else begin
+                    channel_rd_outstanding_ctr <= channel_rd_outstanding_ctr + 1;
+                end
             end
         end
     end
@@ -175,12 +178,13 @@ module dmac_channel_ctrl # (
         end
     end
 
-    // assign wr_req_valid       = channel_active && (buf_fill_level >= MAX_BURST_LEN || channel_rd_req_done && channel_rd_outstanding_ctr == 0) && !channel_wr_req_done;
+    // assign wr_req_valid       = channel_active && (buf_usage >= MAX_BURST_LEN || channel_rd_req_done && channel_rd_outstanding_ctr == 0) && !channel_wr_req_done;
     always_ff @(posedge clk or posedge rst) begin
         if(rst) begin
             wr_req_valid <= 0;
         end else begin
-            if (channel_active && (buf_fill_level >= MAX_BURST_LEN || channel_rd_req_done && channel_rd_outstanding_ctr == 0) && !(wr_req_ack && wr_req_done || channel_wr_req_done)) begin
+            // TODO: buf_usage > nex_burst_len
+            if (channel_active && (buf_usage >= MAX_BURST_LEN || channel_rd_req_done && channel_rd_outstanding_ctr == 0) && !(wr_req_ack && wr_req_done || channel_wr_req_done)) begin
                 wr_req_valid <= 1;
             end else if (wr_req_ack) begin
                 wr_req_valid <= 0;
@@ -190,7 +194,7 @@ module dmac_channel_ctrl # (
     assign wr_req_addr        = channel_wr_ptr;
     assign wr_req_burst       = channel_burst;
     assign wr_req_length      = channel_wr_remaing_len;
-    assign wr_req_data_offset = channel_src_addr[$clog2(ADDR_WD)-1:0]; // src_addr % ADDR_WD_BYTES
+    assign wr_req_data_offset = channel_src_addr[$clog2(ADDR_WD/8)-1:0]; // src_addr % ADDR_WD_BYTES
     assign wr_req_size        = channel_size;
 
 endmodule : dmac_channel_ctrl

@@ -22,11 +22,6 @@ module dmac_read # (
 
     output                              rd_resp_valid,
 
-    // output                              ctrl_out_valid,
-    // output [ADDR_WD-1:0]                ctrl_out_dst_addr,
-    // output [$clog2(ADDR_WD)-1:0]        ctrl_out_rd_offset,
-    // output [ADDR_WD-1:0]                ctrl_out_length, // bytes
-
     output                              data_out_valid,
     input                               data_out_ready,
     output [DATA_WD-1:0]                data_out,
@@ -64,10 +59,6 @@ module dmac_read # (
         .rd_req_next_addr,
         .rd_req_next_length,
         .rd_req_done,
-        // .ctrl_out_valid,
-        // .ctrl_out_dst_addr,
-        // .ctrl_out_rd_offset,
-        // .ctrl_out_length, // bytes
         // Read Address Channel
         .m_axi_arvalid,
         .m_axi_araddr,

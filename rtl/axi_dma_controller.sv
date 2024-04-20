@@ -64,14 +64,16 @@ module axi_dma_controller #(
     logic [ADDR_WD-1:0]                 wr_req_addr;
     logic [axi4_pkg::BURST_BITS-1:0]    wr_req_burst;
     logic [ADDR_WD-1:0]                 wr_req_length;
-    logic [$clog2(ADDR_WD)-1:0]         wr_req_data_offset;
+    logic [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset;
     logic [axi4_pkg::SIZE_BITS-1:0]     wr_req_size;
     logic                               wr_req_ack;
     logic [ADDR_WD-1:0]                 wr_req_next_addr;
     logic [ADDR_WD-1:0]                 wr_req_next_length;
     logic                               wr_req_done;
 
-    logic [$clog2(MAX_BURST_LEN):0]     buf_fill_level;
+    logic                               buf_dec_usage_valid;
+    logic [$clog2(MAX_BURST_LEN)+1:0]   buf_dec_usage_count;
+    logic [$clog2(MAX_BURST_LEN)+1:0]   buf_usage;
     logic               buf_data_in_valid;
     logic               buf_data_in_ready;
     logic [DATA_WD-1:0] buf_data_in;
@@ -100,7 +102,7 @@ module axi_dma_controller #(
         .cmd_size,
         .cmd_ready,
   
-        .buf_fill_level,
+        .buf_usage,
         .rd_req_valid,
         .rd_req_addr,
         .rd_req_burst,
@@ -172,7 +174,9 @@ module axi_dma_controller #(
     ) i_buf(
         .clk,
         .rst,
-        .buf_fill_level,
+        .dec_usage_valid(buf_dec_usage_valid),
+        .dec_usage_count(buf_dec_usage_count),
+        .buf_usage,
         .data_in_valid(buf_data_in_valid),
         .data_in_ready(buf_data_in_ready),
         .data_in(buf_data_in),
@@ -183,12 +187,12 @@ module axi_dma_controller #(
         .data_out_last(buf_data_out_last)
     );
 
-    dmac_write  # (
+    dmac_write # (
         .ADDR_WD(ADDR_WD),
         .DATA_WD(DATA_WD),
         .CHANNEL_COUNT(CHANNEL_COUNT), /// 8 channels
         .MAX_BURST_LEN(MAX_BURST_LEN) /// 16 beats
-    ) i_wr(
+    ) i_wr (
         .clk,
         .rst,
         .wr_req_valid,
@@ -204,6 +208,8 @@ module axi_dma_controller #(
         .data_in_valid(buf_data_out_valid),
         .data_in_ready(buf_data_out_ready),
         .data_in(buf_data_out),
+        .buf_dec_usage_valid,
+        .buf_dec_usage_count,
         // Write Address Channel
         .m_axi_awvalid(M_AXI_AWVALID),
         .m_axi_awaddr(M_AXI_AWADDR),

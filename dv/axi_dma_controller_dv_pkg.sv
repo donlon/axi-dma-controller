@@ -219,6 +219,7 @@ package axi_dma_controller_dv_pkg;
 
         local int cycle = 0;
 
+        bit random_data = 1;
         int max_outstanding = 4;
 
         int arready_throttling = 0;
@@ -289,8 +290,10 @@ package axi_dma_controller_dv_pkg;
             item_t axi_item;
             int resp_latency;
             forever begin
-                @(posedge axi_if.clk);
-                if (rd_queue.size() == 0) continue;
+                if (rd_queue.size() == 0) begin
+                    @(posedge axi_if.clk);
+                    continue;
+                end
                 axi_item = rd_queue[0];
                 // $info("peek");
                 resp_latency = $urandom_range(resp_delay_latency_min, resp_delay_latency_max);
@@ -302,11 +305,14 @@ package axi_dma_controller_dv_pkg;
                 // $info("dequeue");
                 // std::randomize(axi_item.data);
                 foreach (axi_item.data[i]) begin
-                    // axi_item.data[i] = $urandom();
-                    axi_item.data[i] = i - axi_item.data_offset;
+                    if (random_data) begin
+                        axi_item.data[i] = $urandom();
+                    end else begin
+                        axi_item.data[i] = i - axi_item.data_offset;
+                    end
                 end
                 drive_resp_pkt(axi_item); 
-                $info("rd put");
+                // $info("rd put");
                 mon_mbx_out.put(axi_item);
             end
         endtask : drive_r_channel
@@ -314,10 +320,11 @@ package axi_dma_controller_dv_pkg;
         local task automatic drive_resp_pkt(input item_t item);
             // int rvalid_delay;
             bit [DATA_WD-1:0] resp_data;
-            int narrow_offset = item.address & ((ADDR_WD - 1) - (1 << item.size));
+            int narrow_offset = item.address & ((ADDR_WD / 8 - 1) + 1 - (1 << item.size));
             int data_offset = item.data_offset;
             int ret_offset;
             // $info("item.trans = ", item.trans);
+            // $info("narrow_offset = ", narrow_offset);
             for (int i = 0; i < item.trans; i++) begin
                 if (i > 0) begin
                     axi_if.rvalid <= 0;
@@ -327,6 +334,7 @@ package axi_dma_controller_dv_pkg;
 
                 resp_data = 0;
                 ret_offset = i == 0 ? item.data_offset : narrow_offset;
+                // $info("ret_offset: ", ret_offset, "data_offset: ", data_offset);
                 for (int j = 0; j < (1 << item.size)/*DATA_WD / 8*/; j++) begin
                     resp_data[(ret_offset + j)*8+:8] = item.data[data_offset];
                     data_offset++;
@@ -391,7 +399,7 @@ package axi_dma_controller_dv_pkg;
             forever begin
                 cmd_mbx.get(cmd_item);
                 check_cmd(cmd_item);
-                $info("cmd check done");
+                // $info("cmd check done");
             end
         endtask : run
 

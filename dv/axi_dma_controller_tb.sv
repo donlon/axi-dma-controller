@@ -9,6 +9,7 @@ module axi_dma_controller_tb # (
     import axi_dma_controller_dv_pkg::*;
 
     localparam integer STRB_WD = DATA_WD / 8;
+    localparam integer ADDR_WD_BYTES = DATA_WD / 8;
 
     logic clk = 0; // input
     logic rst = 1; // input
@@ -99,6 +100,8 @@ module axi_dma_controller_tb # (
         cmd_if_drv.mon_mbx_out = scb.cmd_mbx;
         axi4_resp.rd_resp.mon_mbx_out = scb.axi_rd_mbx;
         axi4_resp.wr_resp.mon_mbx_out = scb.axi_wr_mbx;
+
+        axi4_resp.rd_resp.random_data = 0;
         fork
             // cmd_if_drv.drive();
             axi4_resp.drive();
@@ -106,16 +109,59 @@ module axi_dma_controller_tb # (
         join
     end
 
+    task automatic send_aligned_cmd(input int max_size);
+        int src_addr;
+        int dst_addr;
+        int len;
+        void'(std::randomize(src_addr, dst_addr, len) with {
+            src_addr % ADDR_WD_BYTES == 0;
+            dst_addr % ADDR_WD_BYTES == 0;
+            len > 0 && len < max_size && len % ADDR_WD_BYTES == 0;
+        });
+        cmd_if_drv.start_dma (
+            .src_addr(src_addr),
+            .dst_addr(dst_addr),
+            .burst(axi4_pkg::INCR),
+            .len(len),
+            .size($clog2(ADDR_WD_BYTES))
+        );
+    endtask : send_aligned_cmd
+
+    task automatic test_aligned();
+        repeat (10) send_aligned_cmd(MAX_BURST_LEN);
+        repeat (20) begin
+            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
+            repeat ($urandom_range(10, 60)) @(posedge clk);
+        end
+        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+    endtask : test_aligned
+
+    task automatic test_aligned_throttling();
+        axi4_resp.rd_resp.max_outstanding = 2;
+        // Read throttling
+        axi4_resp.rd_resp.arready_throttling = 10;
+        axi4_resp.rd_resp.rvalid_throttling  = 5;
+        axi4_resp.rd_resp.resp_delay_latency_min = 0;
+        axi4_resp.rd_resp.resp_delay_latency_max = 20;
+        axi4_resp.wr_resp.awready_throttling = 0;
+        axi4_resp.wr_resp.wready_throttling  = 0;
+        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+        // Write throttling
+        axi4_resp.rd_resp.arready_throttling = 5;
+        axi4_resp.rd_resp.rvalid_throttling  = 5;
+        axi4_resp.rd_resp.resp_delay_latency_min = 0;
+        axi4_resp.rd_resp.resp_delay_latency_max = 5;
+        axi4_resp.wr_resp.awready_throttling = 5;
+        axi4_resp.wr_resp.wready_throttling  = 5;
+        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+    endtask : test_aligned_throttling
+
     initial begin
         @(posedge clk iff !rst);
-
-        cmd_if_drv.start_dma (
-            .src_addr(32'h12340000),
-            .dst_addr(32'h34560000),
-            .burst(axi4_pkg::INCR),
-            .len(100),
-            .size(2)
-        );
+        // test_aligned();
+        test_aligned_throttling();
+        // TODO: wait write request and check scoreboard
+        $finish;
     end
 
 endmodule : axi_dma_controller_tb

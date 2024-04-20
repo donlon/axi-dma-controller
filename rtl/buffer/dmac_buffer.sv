@@ -8,7 +8,9 @@ module dmac_buffer # (
     input clk,
     input rst,
 
-    output [$clog2(MAX_BURST_LEN):0]    buf_fill_level,
+    input                               dec_usage_valid,
+    input  [$clog2(MAX_BURST_LEN)+1:0]  dec_usage_count,
+    output [$clog2(MAX_BURST_LEN)+1:0]  buf_usage,
 
     input                   data_in_valid,
     output                  data_in_ready,
@@ -21,16 +23,9 @@ module dmac_buffer # (
     output                  data_out_last
 );
 
-    // assign data_out_valid = data_in_valid;
-    // assign data_in_ready = data_out_ready;
-    // assign data_out = data_in;
-    // assign data_out_last = data_in_last;
-
-    // ctrl_out_ready
-
     generic_sync_fifo # (
         .DWIDTH(DATA_WD),
-        .AWIDTH($clog2(MAX_BURST_LEN))
+        .AWIDTH($clog2(MAX_BURST_LEN) + 1)
     ) i_buf (
         .clk,
         .rst,
@@ -42,8 +37,18 @@ module dmac_buffer # (
         .rready(data_out_ready),
         .rdata (data_out),
         .ralmost_empty(),
-        .data_count(buf_fill_level)
+        .data_count()
     );
 
+    dmac_buffer_usage_ctr # (
+        .MAX_ELEMENTS(MAX_BURST_LEN * 2)
+    ) i_usage_ctr (
+        .clk,
+        .rst,
+        .inc(data_in_valid && data_in_ready),
+        .dec(dec_usage_valid),
+        .dec_count(dec_usage_count),
+        .usage(buf_usage)
+    );
 
 endmodule : dmac_buffer

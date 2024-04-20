@@ -10,29 +10,22 @@ module dmac_write_initiator # (
     input                       clk,
     input                       rst,
 
-    // input                               ctrl_in_valid,
-    // output                              ctrl_in_ready,
-    // input  [ADDR_WD-1:0]                ctrl_in_dst_addr,
-    // input  [$clog2(ADDR_WD)-1:0]        ctrl_in_rd_offset, // src_addr % ADDR_WD_BYTES
-    // input  [ADDR_WD-1:0]                ctrl_in_length, // bytes
     input                               wr_req_valid,
     output                              wr_req_ack,
     input [ADDR_WD-1:0]                 wr_req_addr,
     input [axi4_pkg::BURST_BITS-1:0]    wr_req_burst,
     input [ADDR_WD-1:0]                 wr_req_length,
-    input [$clog2(ADDR_WD)-1:0]         wr_req_data_offset, // src_addr % ADDR_WD_BYTES
+    input [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset, // src_addr % ADDR_WD_BYTES
     input [axi4_pkg::SIZE_BITS-1:0]     wr_req_size,
     output [ADDR_WD-1:0]                wr_req_next_addr,
     output [ADDR_WD-1:0]                wr_req_next_length,
     output                              wr_req_done,
 
-    // input [axi4_pkg::BURST_BITS-1:0]    channel_burst,
-    // input [axi4_pkg::SIZE_BITS-1:0]     channel_size,
-
-    // input                               data_in_almost_full,
     input                               data_in_valid,
     output                              data_in_ready,
     input  [DATA_WD-1:0]                data_in,
+    output                              buf_dec_usage_valid,
+    output [$clog2(MAX_BURST_LEN+1):0]  buf_dec_usage_count,
 
     // Write Address Channel
     output logic                m_axi_awvalid,
@@ -73,10 +66,12 @@ module dmac_write_initiator # (
 
     assign wr_req_next_addr = wr_req_addr + aligned_len_bytes;
     assign wr_req_next_length = wr_req_length - burst_len_bytes;
+    assign buf_dec_usage_valid = wr_start;
+    assign buf_dec_usage_count = burst_len_trans;
 
     wire [ADDR_WD-1:0] axi_awlen = burst_len_trans - 1;
 
-    wire  wr_delay = wr_req_data_offset > wr_req_addr[$clog2(ADDR_WD)-1:0]; // TODO: reg
+    wire  wr_delay = wr_req_data_offset > wr_req_addr[$clog2(ADDR_WD/8)-1:0]; // TODO: reg
     logic wr_delay_done;
 
     // Shifter
@@ -86,7 +81,7 @@ module dmac_write_initiator # (
     logic [$clog2(ADDR_WD/8):0] data_shift_bytes;
 
     assign data_shift_bytes[$clog2(ADDR_WD/8)]     = data_shift_bytes[$clog2(ADDR_WD/8)-1:0] == 0;
-    assign data_shift_bytes[$clog2(ADDR_WD/8)-1:0] = wr_req_data_offset - wr_req_addr[$clog2(ADDR_WD)-1:0];
+    assign data_shift_bytes[$clog2(ADDR_WD/8)-1:0] = wr_req_data_offset - wr_req_addr[$clog2(ADDR_WD/8)-1:0];
 
     always_ff @(posedge clk or posedge rst) begin
         if(rst) begin
@@ -133,7 +128,7 @@ module dmac_write_initiator # (
         if (rst) begin
             m_axi_wvalid <= 0;
         end else begin
-            if (wr_req_valid && (!wr_delay || data_in_q_valid)) begin
+            if (wr_start && (!wr_delay || data_in_q_valid)) begin
                 m_axi_wvalid <= 1;
             end else if (m_axi_wvalid && m_axi_wready && m_axi_wlast) begin
                 m_axi_wvalid <= 0;
@@ -175,7 +170,7 @@ module dmac_write_initiator # (
         end else begin
             if (wr_start) begin
                 m_axi_wlast <= axi_awlen == 0;
-            end else if (wr_active) begin
+            end else if (m_axi_wvalid && m_axi_wready && wr_active) begin
                 m_axi_wlast <= wr_counter == 1;
             end
         end
@@ -190,7 +185,7 @@ module dmac_write_initiator # (
     assign wr_req_ack = aw_fire_last;
     assign wr_req_done = wr_req_next_length == 0;
 
-    assert property (@(posedge clk) disable iff (rst) wr_req_valid |-> data_in_valid)
+    assert property (@(posedge clk) disable iff (rst) wr_req_valid && !wr_req_ack |-> data_in_valid)
             else $error("Data is not ready");
 
 endmodule : dmac_write_initiator
