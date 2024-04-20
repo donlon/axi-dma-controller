@@ -45,9 +45,6 @@ module dmac_write_initiator # (
     localparam MAX_BURST_BYTES = MAX_BURST_LEN * (ADDR_WD / 8);
     localparam BURST_BITS = $clog2(MAX_BURST_BYTES);
 
-    // logic aw_done;
-    // logic w_done;
-
     wire  aw_active = m_axi_awvalid;
     logic wr_active;
     logic [$clog2(MAX_BURST_BYTES)-1:0] wr_counter;
@@ -56,7 +53,6 @@ module dmac_write_initiator # (
     wire aw_fire_last = m_axi_awvalid && m_axi_awready;
     wire w_fire_last  = m_axi_wvalid && m_axi_wready && m_axi_wlast;
 
-    // TODO: data before ctrl?
     wire [ADDR_WD-1:0] aligned_len_bytes = (1 << BURST_BITS) - wr_req_addr[BURST_BITS-1:0];
     wire [ADDR_WD-1:0] burst_len_bytes = aligned_len_bytes > wr_req_length ? wr_req_length : aligned_len_bytes;
 
@@ -141,7 +137,7 @@ module dmac_write_initiator # (
             m_axi_wstrb <= 'x;
         end else begin
             if (wr_start) begin
-                m_axi_wstrb <= (1 << (ADDR_WD / 8)) - (1 << wr_req_addr[$clog2(ADDR_WD)-1:0]);
+                m_axi_wstrb <= (1 << (ADDR_WD / 8)) - (1 << wr_req_addr[$clog2(ADDR_WD / 8)-1:0]);
             end else if (m_axi_wvalid && m_axi_wready) begin
                 m_axi_wstrb <= '1; // TODO: dst_addr + len is not aligned
                 // wr_counter == 1
