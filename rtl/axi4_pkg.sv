@@ -5,8 +5,8 @@ package axi4_pkg;
     localparam BURST_BITS = 2;
     localparam RESP_BITS = 2;
     
-    typedef bit [LEN_BITS-1]    len_t;
-    typedef bit [SIZE_BITS-1]   size_t;
+    typedef bit [LEN_BITS-1:0]  len_t;
+    typedef bit [SIZE_BITS-1:0] size_t;
 
     typedef enum logic [BURST_BITS-1:0] {
         FIXED = 0,

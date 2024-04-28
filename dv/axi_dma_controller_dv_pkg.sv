@@ -424,13 +424,18 @@ package axi_dma_controller_dv_pkg;
             end
             rd_buf_ptr = 0;
             while (wr_remaining_len > 0) begin
+                int err_count = 0;
                 axi_wr_mbx.get(axi_item);
                 check_burst_common(dst_ptr, wr_remaining_len, cmd_item, axi_item);
                 for (int i = axi_item.data_offset; i < axi_item.length; i++) begin
-                    assert (rdata_buf[rd_buf_ptr] == axi_item.data[i])
-                        else $error("Write data mismatch (sa: 0x%08x, 0x%02x, da: 0x%08x, 0x%02x)",
-                            cmd_item.src_addr + rd_buf_ptr, rdata_buf[rd_buf_ptr],
-                            cmd_item.dst_addr + rd_buf_ptr, axi_item.data[i]);
+                    if (err_count < 4) begin
+                        assert (rdata_buf[rd_buf_ptr] == axi_item.data[i]) else begin
+                            $error("Write data mismatch (sa: 0x%08x, 0x%02x, da: 0x%08x, 0x%02x)",
+                                cmd_item.src_addr + rd_buf_ptr, rdata_buf[rd_buf_ptr],
+                                cmd_item.dst_addr + rd_buf_ptr, axi_item.data[i]);
+                            err_count++;
+                        end
+                    end
                     rd_buf_ptr++; // TODO: unaligned
                 end
                 // strb
@@ -450,9 +455,10 @@ package axi_dma_controller_dv_pkg;
             bit [ADDR_WD-1:0] aligned_req_addr = addr_ptr & ~((1 << cmd_item.size) - 1);
             bit [ADDR_WD-1:0] burst_len_trans = (addr_ptr + expected_burst_len_bytes + ((1 << cmd_item.size) - 1) - aligned_req_addr) >> cmd_item.size;
 
-            assert (axi_item.burst == cmd_item.burst) else $error("invalid axi_item.burst, expected: 0x%0x", cmd_item.burst);
-            assert (axi_item.size == cmd_item.size)   else $error("invalid axi_item.size, expected: 0x%0x", cmd_item.size);
-            assert (axi_item.trans == burst_len_trans)  else $error("invalid axi_item.len, expected: 0x%0x", burst_len_trans);
+            assert (axi_item.address == addr_ptr)      else $error("addr 0x%08x: unexpected a%saddr, expected: 0x%0x",  axi_item.address, axi_item.is_read ? "r" : "w", axi_item.is_read ? cmd_item.src_addr : cmd_item.dst_addr);
+            assert (axi_item.burst == cmd_item.burst)  else $error("addr 0x%08x: unexpected a%sburst, expected: 0x%0x", axi_item.address, axi_item.is_read ? "r" : "w", cmd_item.burst);
+            assert (axi_item.size == cmd_item.size)    else $error("addr 0x%08x: unexpected a%ssize, expected: 0x%0x",  axi_item.address, axi_item.is_read ? "r" : "w", cmd_item.size);
+            assert (axi_item.trans == burst_len_trans) else $error("addr 0x%08x: unexpected a%slen, expected: 0x%0x",   axi_item.address, axi_item.is_read ? "r" : "w", burst_len_trans - 1);
 
             addr_ptr += aligned_len_bytes;
             remaining_len -= expected_burst_len_bytes;

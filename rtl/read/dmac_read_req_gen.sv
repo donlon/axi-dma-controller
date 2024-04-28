@@ -36,6 +36,7 @@ module dmac_read_req_gen # (
 );
 
     logic cmd_blocking;
+    logic cmd_out_blocking;
     logic rd_req_fired;
     logic cmd_out_fired;
 
@@ -50,6 +51,7 @@ module dmac_read_req_gen # (
     // logic [2:0]                         rd_req_len_reg;
     logic [axi4_pkg::SIZE_BITS-1:0]     rd_req_size_reg;
     logic                               rd_req_last;
+    logic                               rd_req_last_reg;
 
     dmac_addr_gen # (
         .ADDR_WD(ADDR_WD),
@@ -64,7 +66,8 @@ module dmac_read_req_gen # (
         .req_last
     );
 
-    assign cmd_ready = ((rd_req_ready && rd_req_last) || !rd_req_valid) && cmd_out_ready;
+    assign cmd_ready = (!rd_req_valid || (rd_req_ready && rd_req_last)) && 
+        ((/*cmd_out_valid && */cmd_out_ready) || cmd_out_fired);
 
     /// read req
 
@@ -76,6 +79,18 @@ module dmac_read_req_gen # (
                 cmd_blocking <= 1;
             end else if (cmd_ready) begin
                 cmd_blocking <= 0;
+            end
+        end
+    end
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            cmd_out_blocking <= 0;
+        end else begin
+            if (cmd_out_valid && !cmd_out_ready) begin
+                cmd_out_blocking <= 1;
+            end else if (cmd_out_ready) begin
+                cmd_out_blocking <= 0;
             end
         end
     end
@@ -99,19 +114,21 @@ module dmac_read_req_gen # (
             rd_req_burst_reg <= 'x;
             rd_req_size_reg <= 'x;
             // rd_req_last <= 0;
+            rd_req_last_reg <= 0;
         end else begin
-            // if (cmd_valid && !rd_req_valid) begin
-            // if (cmd_valid && !cmd_blocking) begin // load
-            if (cmd_valid && cmd_ready || cmd_valid && !rd_req_valid/* && !cmd_blocking*/) begin
+            // if (cmd_valid && cmd_ready || cmd_valid && !(rd_req_valid && rd_req_last && !rd_req_ready)/* && !cmd_blocking*/) begin
+            if (cmd_valid && cmd_ready || cmd_valid && !rd_req_valid && !rd_req_last/* && !cmd_blocking*/) begin
                 rd_req_addr_reg   <= cmd_src_addr;
                 rd_req_length_reg <= cmd_len;
                 rd_req_burst_reg  <= cmd_burst;
                 rd_req_size_reg   <= cmd_size;
                 // rd_req_last       <= req_last;
+                rd_req_last_reg       <= req_last;
             end else if (rd_req_valid && rd_req_ready) begin // next
                 rd_req_addr_reg   <= next_addr;
                 rd_req_length_reg <= next_length;
                 // rd_req_last       <= req_last;
+                rd_req_last_reg       <= req_last;
             end
         end
     end
@@ -121,10 +138,12 @@ module dmac_read_req_gen # (
         if (rst) begin
             rd_req_valid <= 0;
         end else begin
-            if (cmd_valid)
+            if (cmd_valid && cmd_ready || cmd_valid && !rd_req_valid && !rd_req_last/* && !cmd_blocking*/) begin
+            // if (cmd_valid && !cmd_blocking)
                 rd_req_valid <= 1;
-            else if (rd_req_valid /*rm*/&& rd_req_ready && rd_req_last)
+            end else if (rd_req_valid /*rm*/&& rd_req_ready && rd_req_last) begin
                 rd_req_valid <= 0;
+            end
         end
     end
 

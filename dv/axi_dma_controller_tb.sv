@@ -136,12 +136,17 @@ module axi_dma_controller_tb # (
     endtask : test_demo
 
     task automatic test_aligned();
-        repeat (10) send_aligned_cmd(MAX_BURST_LEN);
-        repeat (20) begin
+        repeat (40) send_aligned_cmd(ADDR_WD_BYTES * 3);
+        repeat (40) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES);
+        repeat (20) begin // Fill FIFO
             send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
-            repeat ($urandom_range(10, 60)) @(posedge clk);
+            repeat ($urandom_range(0, MAX_BURST_LEN)) @(posedge clk);
         end
-        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+        repeat (20) begin // Drain FIFO
+            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
+            repeat ($urandom_range(MAX_BURST_LEN, MAX_BURST_LEN * 4)) @(posedge clk);
+        end
+        repeat (100) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
     endtask : test_aligned
 
     task automatic test_aligned_throttling();
