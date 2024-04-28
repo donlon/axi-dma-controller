@@ -49,6 +49,7 @@ module dmac_write # (
     logic [axi4_pkg::LEN_BITS-1:0]      wr_req_len;
     logic [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset;
     logic [axi4_pkg::SIZE_BITS-1:0]     wr_req_size;
+    logic                               wr_req_last;
 
     dmac_write_req_gen # (
         .ADDR_WD(ADDR_WD),
@@ -71,7 +72,8 @@ module dmac_write # (
         .wr_req_burst,
         .wr_req_len,
         .wr_req_data_offset,
-        .wr_req_size
+        .wr_req_size,
+        .wr_req_last
     );
 
     dmac_write_initiator # (
@@ -89,6 +91,7 @@ module dmac_write # (
         .wr_req_len,
         .wr_req_data_offset,
         .wr_req_size,
+        .wr_req_last,
         .data_in_valid,
         .data_in_ready,
         .data_in,

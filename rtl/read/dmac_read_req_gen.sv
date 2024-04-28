@@ -100,8 +100,9 @@ module dmac_read_req_gen # (
             rd_req_size_reg <= 'x;
             // rd_req_last <= 0;
         end else begin
-            // if (cmd_valid && cmd_ready || cmd_valid && !rd_req_valid/* && !cmd_blocking*/) begin
-            if (cmd_valid && !cmd_blocking) begin // load
+            // if (cmd_valid && !rd_req_valid) begin
+            // if (cmd_valid && !cmd_blocking) begin // load
+            if (cmd_valid && cmd_ready || cmd_valid && !rd_req_valid/* && !cmd_blocking*/) begin
                 rd_req_addr_reg   <= cmd_src_addr;
                 rd_req_length_reg <= cmd_len;
                 rd_req_burst_reg  <= cmd_burst;

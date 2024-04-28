@@ -83,7 +83,7 @@ module axi_dma_controller_tb # (
         .M_AXI_BREADY (axi_if.bready)
     );
 
-    initial forever #0.1ns clk = !clk;
+    initial forever #0.5ns clk = !clk;
 
     initial begin
         #20ns;

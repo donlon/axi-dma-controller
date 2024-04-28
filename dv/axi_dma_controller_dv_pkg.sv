@@ -428,7 +428,9 @@ package axi_dma_controller_dv_pkg;
                 check_burst_common(dst_ptr, wr_remaining_len, cmd_item, axi_item);
                 for (int i = axi_item.data_offset; i < axi_item.length; i++) begin
                     assert (rdata_buf[rd_buf_ptr] == axi_item.data[i])
-                        else $error("Write data mismatch at byte %0d", rd_buf_ptr);
+                        else $error("Write data mismatch (sa: 0x%08x, 0x%02x, da: 0x%08x, 0x%02x)",
+                            cmd_item.src_addr + rd_buf_ptr, rdata_buf[rd_buf_ptr],
+                            cmd_item.dst_addr + rd_buf_ptr, axi_item.data[i]);
                     rd_buf_ptr++; // TODO: unaligned
                 end
                 // strb
@@ -448,9 +450,9 @@ package axi_dma_controller_dv_pkg;
             bit [ADDR_WD-1:0] aligned_req_addr = addr_ptr & ~((1 << cmd_item.size) - 1);
             bit [ADDR_WD-1:0] burst_len_trans = (addr_ptr + expected_burst_len_bytes + ((1 << cmd_item.size) - 1) - aligned_req_addr) >> cmd_item.size;
 
-            assert (axi_item.burst == cmd_item.burst) else $error("invalid axi_item.burst");
-            assert (axi_item.size == cmd_item.size)   else $error("invalid axi_item.size");
-            assert (axi_item.trans == burst_len_trans)  else $error("invalid axi_item.len");
+            assert (axi_item.burst == cmd_item.burst) else $error("invalid axi_item.burst, expected: 0x%0x", cmd_item.burst);
+            assert (axi_item.size == cmd_item.size)   else $error("invalid axi_item.size, expected: 0x%0x", cmd_item.size);
+            assert (axi_item.trans == burst_len_trans)  else $error("invalid axi_item.len, expected: 0x%0x", burst_len_trans);
 
             addr_ptr += aligned_len_bytes;
             remaining_len -= expected_burst_len_bytes;
