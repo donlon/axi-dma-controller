@@ -101,7 +101,7 @@ module axi_dma_controller_tb # (
         axi4_resp.rd_resp.mon_mbx_out = scb.axi_rd_mbx;
         axi4_resp.wr_resp.mon_mbx_out = scb.axi_wr_mbx;
 
-        axi4_resp.rd_resp.random_data = 0;
+        axi4_resp.rd_resp.random_data = 1;
         fork
             // cmd_if_drv.drive();
             axi4_resp.drive();
@@ -150,23 +150,24 @@ module axi_dma_controller_tb # (
     endtask : test_aligned
 
     task automatic test_aligned_throttling();
-        axi4_resp.rd_resp.max_outstanding = 2;
+        axi4_resp.rd_resp.max_outstanding = 3;
         // Read throttling
-        axi4_resp.rd_resp.arready_throttling = 10;
-        axi4_resp.rd_resp.rvalid_throttling  = 5;
+        axi4_resp.rd_resp.arready_throttling = 5;
+        axi4_resp.rd_resp.rvalid_throttling  = 0;
         axi4_resp.rd_resp.resp_delay_latency_min = 0;
         axi4_resp.rd_resp.resp_delay_latency_max = 20;
         axi4_resp.wr_resp.awready_throttling = 0;
         axi4_resp.wr_resp.wready_throttling  = 0;
-        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+        repeat (20) send_aligned_cmd(ADDR_WD_BYTES * 3);
+        repeat (40) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
         // Write throttling
-        axi4_resp.rd_resp.arready_throttling = 5;
-        axi4_resp.rd_resp.rvalid_throttling  = 5;
+        axi4_resp.rd_resp.arready_throttling = 4;
+        axi4_resp.rd_resp.rvalid_throttling  = 4;
         axi4_resp.rd_resp.resp_delay_latency_min = 0;
         axi4_resp.rd_resp.resp_delay_latency_max = 5;
-        axi4_resp.wr_resp.awready_throttling = 5;
-        axi4_resp.wr_resp.wready_throttling  = 5;
-        repeat (20) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
+        axi4_resp.wr_resp.awready_throttling = 7;
+        axi4_resp.wr_resp.wready_throttling  = 7;
+        repeat (40) send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 4);
     endtask : test_aligned_throttling
 
     task automatic send_narrow_cmd(input int max_size);

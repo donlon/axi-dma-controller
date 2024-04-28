@@ -148,7 +148,7 @@ module dmac_write_initiator # (
         end else begin
             if (wr_req_valid && wr_req_ready) begin
                 wr_counter <= wr_req_len;
-            end else if (m_axi_wvalid && m_axi_wready) begin
+            end else if (m_axi_wvalid && m_axi_wready && !m_axi_wlast) begin
                 wr_counter <= wr_counter - 1;
             end
         end
@@ -172,8 +172,10 @@ module dmac_write_initiator # (
         end else begin
             if (wr_req_valid && wr_req_ready || wr_waiting_data) begin
                 m_axi_wvalid <= data_in_valid && (wr_delay_all ? data_in_q_valid : 1);
-            end else if (m_axi_wvalid && m_axi_wready) begin
-                m_axi_wvalid <= m_axi_wlast ? 0 : data_in_valid;
+            end else if (m_axi_wvalid && m_axi_wready && m_axi_wlast) begin
+                m_axi_wvalid <= 0;
+            end else if (wr_active) begin
+                m_axi_wvalid <= data_in_valid;
             end
         end
     end
@@ -204,7 +206,9 @@ module dmac_write_initiator # (
         end
     end
     always_ff @(posedge clk) begin
-        m_axi_wdata <= {data_in, data_in_q} >> (data_shift_bytes * 8);
+        if (data_in_valid && data_in_ready) begin
+            m_axi_wdata <= {data_in, data_in_q} >> (data_shift_bytes * 8);
+        end
     end
 
 endmodule : dmac_write_initiator

@@ -322,13 +322,19 @@ package axi_dma_controller_dv_pkg;
             int narrow_offset = (item.address % (ADDR_WD / 8)) & ((1 << item.size) - 1);
             int data_offset = item.data_offset;
             int ret_offset;
-            // $info("item.trans = ", item.trans);
+            // $info("resp addr = 0x%08x", item.address);
             // $info("narrow_offset = ", narrow_offset);
             for (int i = 0; i < item.trans; i++) begin
                 if (i > 0) begin
-                    axi_if.rvalid <= 0;
-                    repeat ($urandom_range(0, rvalid_throttling)) @(posedge axi_if.clk);
-                    axi_if.rvalid <= 1;
+                    int delay = $urandom_range(0, rvalid_throttling);
+                    if (delay > 0) begin
+                        axi_if.rvalid <= 0;
+                        axi_if.rdata  <= 'x;
+                        axi_if.rresp  <= 'x;
+                        axi_if.rlast  <= 'x;
+                        repeat (delay) @(posedge axi_if.clk);
+                    end
+                    // axi_if.rvalid <= 1;
                 end
 
                 resp_data = 0;
@@ -349,6 +355,9 @@ package axi_dma_controller_dv_pkg;
                 @(posedge axi_if.clk iff axi_if.rvalid && axi_if.rready);
                 if (i == item.trans - 1) begin
                     axi_if.rvalid <= 0;
+                    axi_if.rdata  <= 'x;
+                    axi_if.rresp  <= 'x;
+                    axi_if.rlast  <= 'x;
                 end
             end
         endtask : drive_resp_pkt
