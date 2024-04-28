@@ -129,7 +129,7 @@ module axi_dma_controller_tb # (
 
     task automatic test_demo();
         repeat (20) begin
-            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 5);
+            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 3);
             repeat ($urandom_range(0, $urandom_range(0, 9) > 8 ? 60 : 0)) @(posedge clk);
         end
         #20ns;

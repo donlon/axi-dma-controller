@@ -43,11 +43,11 @@ package axi_dma_controller_dv_pkg;
         
         task drive_cmd_if (input cmd_item_t item);
             cmd_if.valid <= 1;
-            cmd_if.src_addr = item.src_addr;
-            cmd_if.dst_addr = item.dst_addr;
-            cmd_if.burst = item.burst;
-            cmd_if.len = item.len;
-            cmd_if.size = item.size;
+            cmd_if.src_addr <= item.src_addr;
+            cmd_if.dst_addr <= item.dst_addr;
+            cmd_if.burst <= item.burst;
+            cmd_if.len <= item.len;
+            cmd_if.size <= item.size;
             @(posedge cmd_if.clk iff cmd_if.ready);
 
             cmd_if.valid <= 0;
@@ -255,19 +255,18 @@ package axi_dma_controller_dv_pkg;
             item_t axi_item;
 
             forever begin
-                if (!axi_if.arvalid) @(posedge axi_if.clk iff axi_if.arvalid);
-                repeat ($urandom_range(0, arready_throttling)) @(posedge axi_if.clk);
                 forever begin
                     if (rd_queue.size() >= max_outstanding) begin
+                        axi_if.arready <= 0;
                         @(posedge axi_if.clk);
                     end else begin
+                        axi_if.arready <= 1;
                         break;
                     end
                 end
+                @(posedge axi_if.clk iff axi_if.arvalid);
 
                 // $info("asserted");
-                axi_if.arready <= 1;
-                @(posedge axi_if.clk);
                 axi_item = new;
                 axi_item.req_time = cycle;
                 axi_item.is_read = 1;
@@ -282,7 +281,7 @@ package axi_dma_controller_dv_pkg;
                 rd_queue.push_back(axi_item);
                 // $info("enqueue");
                 axi_if.arready <= 0;
-                @(posedge axi_if.clk); // wait arvalid
+                repeat ($urandom_range(0, arready_throttling)) @(posedge axi_if.clk);
             end
         endtask : drive_ar_channel
 

@@ -7,25 +7,21 @@ module dmac_write # (
 
     localparam int STRB_WD = DATA_WD / 8
 ) (
-    input                       clk,
-    input                       rst,
+    input                           clk,
+    input                           rst,
 
-    input                               wr_req_valid,
-    input [ADDR_WD-1:0]                 wr_req_addr,
-    input [axi4_pkg::BURST_BITS-1:0]    wr_req_burst,
-    input [ADDR_WD-1:0]                 wr_req_length,
-    input [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset, // src_addr % ADDR_WD_BYTES
-    input [axi4_pkg::SIZE_BITS-1:0]     wr_req_size,
-    output                              wr_req_ack,
-    output [ADDR_WD-1:0]                wr_req_next_addr,
-    output [ADDR_WD-1:0]                wr_req_next_length,
-    output                              wr_req_done,
+    input                           cmd_in_valid,
+    output logic                    cmd_in_ready,
+    input [$clog2(ADDR_WD/8)-1:0]   cmd_in_src_offset,
+    input [ADDR_WD-1:0]             cmd_in_dst_addr,
+    input [1:0]                     cmd_in_burst,
+    input [ADDR_WD-1:0]             cmd_in_len,
+    input [2:0]                     cmd_in_size,
 
-    input                               data_in_valid,
-    output                              data_in_ready,
-    input  [DATA_WD-1:0]                data_in,
-    output                              buf_dec_usage_valid,
-    output [$clog2(MAX_BURST_LEN)+1:0]  buf_dec_usage_count,
+    input                           data_in_valid,
+    output                          data_in_ready,
+    input  [DATA_WD-1:0]            data_in,
+    input                           data_in_last,
 
     // Write Address Channel
     output wire                 m_axi_awvalid,
@@ -46,6 +42,38 @@ module dmac_write # (
     output wire                 m_axi_bready
 );
 
+    logic                               wr_req_valid;
+    logic                               wr_req_ready;
+    logic [ADDR_WD-1:0]                 wr_req_addr;
+    logic [axi4_pkg::BURST_BITS-1:0]    wr_req_burst;
+    logic [axi4_pkg::LEN_BITS-1:0]      wr_req_len;
+    logic [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset;
+    logic [axi4_pkg::SIZE_BITS-1:0]     wr_req_size;
+
+    dmac_write_req_gen # (
+        .ADDR_WD(ADDR_WD),
+        .DATA_WD(DATA_WD),
+        .CHANNEL_COUNT(CHANNEL_COUNT), /// 8 channels
+        .MAX_BURST_LEN(MAX_BURST_LEN) /// 16 beats
+    ) i_req_gen (
+        .clk,
+        .rst,
+        .cmd_in_valid,
+        .cmd_in_ready,
+        .cmd_in_src_offset,
+        .cmd_in_dst_addr,
+        .cmd_in_burst,
+        .cmd_in_len,
+        .cmd_in_size,
+        .wr_req_valid,
+        .wr_req_ready,
+        .wr_req_addr,
+        .wr_req_burst,
+        .wr_req_len,
+        .wr_req_data_offset,
+        .wr_req_size
+    );
+
     dmac_write_initiator # (
         .ADDR_WD(32),
         .DATA_WD(32),
@@ -55,20 +83,16 @@ module dmac_write # (
         .clk,
         .rst,
         .wr_req_valid,
+        .wr_req_ready,
         .wr_req_addr,
         .wr_req_burst,
-        .wr_req_length,
+        .wr_req_len,
         .wr_req_data_offset,
         .wr_req_size,
-        .wr_req_ack,
-        .wr_req_next_addr,
-        .wr_req_next_length,
-        .wr_req_done,
         .data_in_valid,
         .data_in_ready,
         .data_in,
-        .buf_dec_usage_valid,
-        .buf_dec_usage_count,
+        .data_in_last,
         // Write Address Channel
         .m_axi_awvalid,
         .m_axi_awaddr,

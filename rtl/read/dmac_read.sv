@@ -10,17 +10,22 @@ module dmac_read # (
     input                               clk,
     input                               rst,
 
-    input                               rd_req_valid,
-    input [ADDR_WD-1:0]                 rd_req_addr,
-    input [axi4_pkg::BURST_BITS-1:0]    rd_req_burst,
-    input [ADDR_WD-1:0]                 rd_req_length,
-    input [axi4_pkg::SIZE_BITS-1:0]     rd_req_size,
-    output                              rd_req_ack,
-    output [ADDR_WD-1:0]                rd_req_next_addr,
-    output [ADDR_WD-1:0]                rd_req_next_length,
-    output                              rd_req_done,
+    // DMA Command
+    input                               cmd_valid,
+    output logic                        cmd_ready,
+    input [ADDR_WD-1:0]                 cmd_src_addr,
+    input [ADDR_WD-1:0]                 cmd_dst_addr,
+    input [1:0]                         cmd_burst,
+    input [ADDR_WD-1:0]                 cmd_len,
+    input [2:0]                         cmd_size,
 
-    output                              rd_resp_valid,
+    output                              cmd_out_valid,
+    input                               cmd_out_ready,
+    output [$clog2(ADDR_WD/8)-1:0]      cmd_out_src_offset,
+    output [ADDR_WD-1:0]                cmd_out_dst_addr,
+    output [1:0]                        cmd_out_burst,
+    output [ADDR_WD-1:0]                cmd_out_len,
+    output [2:0]                        cmd_out_size,
 
     output                              data_out_valid,
     input                               data_out_ready,
@@ -42,6 +47,44 @@ module dmac_read # (
     output wire                         m_axi_rready
 );
 
+    logic                               rd_req_valid;
+    logic                               rd_req_ready;
+    logic [ADDR_WD-1:0]                 rd_req_addr;
+    logic [axi4_pkg::BURST_BITS-1:0]    rd_req_burst;
+    logic [axi4_pkg::LEN_BITS-1:0]      rd_req_len;
+    logic [axi4_pkg::SIZE_BITS-1:0]     rd_req_size;
+
+    dmac_read_req_gen # (
+        .ADDR_WD(ADDR_WD),
+        .DATA_WD(DATA_WD),
+        .CHANNEL_COUNT(CHANNEL_COUNT), /// 8 channels
+        .MAX_BURST_LEN(MAX_BURST_LEN) /// 16 beats
+    ) i_req_gen (
+        .clk,
+        .rst,
+        // DMA Command
+        .cmd_valid,
+        .cmd_ready,
+        .cmd_src_addr,
+        .cmd_dst_addr,
+        .cmd_burst,
+        .cmd_len,
+        .cmd_size,
+        .rd_req_valid,
+        .rd_req_ready,
+        .rd_req_addr,
+        .rd_req_burst,
+        .rd_req_len,
+        .rd_req_size,
+        .cmd_out_valid,
+        .cmd_out_ready,
+        .cmd_out_src_offset,
+        .cmd_out_dst_addr,
+        .cmd_out_burst,
+        .cmd_out_len,
+        .cmd_out_size
+    );
+
     dmac_read_initiator # (
         .ADDR_WD(ADDR_WD),
         .DATA_WD(DATA_WD),
@@ -51,14 +94,11 @@ module dmac_read # (
         .clk,
         .rst,
         .rd_req_valid,
+        .rd_req_ready,
         .rd_req_addr,
         .rd_req_burst,
-        .rd_req_length,
+        .rd_req_len,
         .rd_req_size,
-        .rd_req_ack,
-        .rd_req_next_addr,
-        .rd_req_next_length,
-        .rd_req_done,
         // Read Address Channel
         .m_axi_arvalid,
         .m_axi_araddr,
@@ -76,11 +116,11 @@ module dmac_read # (
     ) i_handler (
         .clk,
         .rst,
-        .rd_resp_valid,
         .data_out_valid,
         .data_out_ready,
         .data_out,
         .data_out_last,
+        .rd_resp_valid(),
         // Read Response Channel
         .m_axi_rvalid,
         .m_axi_rdata,

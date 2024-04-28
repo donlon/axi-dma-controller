@@ -49,82 +49,28 @@ module axi_dma_controller #(
     output wire                   M_AXI_BREADY
 );
 
-    logic                               rd_req_valid;
-    logic [ADDR_WD-1:0]                 rd_req_addr;
-    logic [axi4_pkg::BURST_BITS-1:0]    rd_req_burst;
-    logic [ADDR_WD-1:0]                 rd_req_length;
-    logic [axi4_pkg::SIZE_BITS-1:0]     rd_req_size;
-    logic                               rd_req_ack;
-    logic [ADDR_WD-1:0]                 rd_req_next_addr;
-    logic [ADDR_WD-1:0]                 rd_req_next_length;
-    logic                               rd_req_done;
-    logic                               rd_resp_valid;
-
-    logic                               wr_req_valid;
-    logic [ADDR_WD-1:0]                 wr_req_addr;
-    logic [axi4_pkg::BURST_BITS-1:0]    wr_req_burst;
-    logic [ADDR_WD-1:0]                 wr_req_length;
-    logic [$clog2(ADDR_WD/8)-1:0]       wr_req_data_offset;
-    logic [axi4_pkg::SIZE_BITS-1:0]     wr_req_size;
-    logic                               wr_req_ack;
-    logic [ADDR_WD-1:0]                 wr_req_next_addr;
-    logic [ADDR_WD-1:0]                 wr_req_next_length;
-    logic                               wr_req_done;
-
-    logic                               buf_dec_usage_valid;
-    logic [$clog2(MAX_BURST_LEN)+1:0]   buf_dec_usage_count;
-    logic [$clog2(MAX_BURST_LEN)+1:0]   buf_usage;
-    logic               buf_data_in_valid;
-    logic               buf_data_in_ready;
-    logic [DATA_WD-1:0] buf_data_in;
-    logic               buf_data_in_last;
-    logic               buf_data_out_valid;
-    logic               buf_data_out_ready;
-    logic [DATA_WD-1:0] buf_data_out;
-    logic               buf_data_out_last;
-
-    dmac_channel_ctrl # (
-    // dmac_channels # (
-        .ADDR_WD(ADDR_WD),
-        .DATA_WD(DATA_WD),
-        .CHANNEL_COUNT(CHANNEL_COUNT), /// 8 channels
-        .MAX_BURST_LEN(MAX_BURST_LEN) /// 16 beats
-    ) i_channels (
-        .clk,
-        .rst,
-
-        // DMA Command
-        .cmd_valid,
-        .cmd_src_addr,
-        .cmd_dst_addr,
-        .cmd_burst,
-        .cmd_len,
-        .cmd_size,
-        .cmd_ready,
-  
-        .buf_usage,
-        .rd_req_valid,
-        .rd_req_addr,
-        .rd_req_burst,
-        .rd_req_length,
-        .rd_req_size,
-        .rd_req_ack,
-        .rd_req_next_addr,
-        .rd_req_next_length,
-        .rd_req_done,
-        .rd_resp_valid,
-
-        .wr_req_valid,
-        .wr_req_addr,
-        .wr_req_burst,
-        .wr_req_length,
-        .wr_req_data_offset,
-        .wr_req_size,
-        .wr_req_ack,
-        .wr_req_next_addr,
-        .wr_req_next_length,
-        .wr_req_done
-    );
+    logic                           buf_cmd_in_valid;
+    logic                           buf_cmd_in_ready;
+    logic [$clog2(ADDR_WD/8)-1:0]   buf_cmd_in_src_offset;
+    logic [ADDR_WD-1:0]             buf_cmd_in_dst_addr;
+    logic [1:0]                     buf_cmd_in_burst;
+    logic [ADDR_WD-1:0]             buf_cmd_in_len;
+    logic [2:0]                     buf_cmd_in_size;
+    logic                           buf_cmd_out_valid;
+    logic                           buf_cmd_out_ready;
+    logic [$clog2(ADDR_WD/8)-1:0]   buf_cmd_out_src_offset;
+    logic [ADDR_WD-1:0]             buf_cmd_out_dst_addr;
+    logic [1:0]                     buf_cmd_out_burst;
+    logic [ADDR_WD-1:0]             buf_cmd_out_len;
+    logic [2:0]                     buf_cmd_out_size;
+    logic                           buf_data_in_valid;
+    logic                           buf_data_in_ready;
+    logic [DATA_WD-1:0]             buf_data_in;
+    logic                           buf_data_in_last;
+    logic                           buf_data_out_valid;
+    logic                           buf_data_out_ready;
+    logic [DATA_WD-1:0]             buf_data_out;
+    logic                           buf_data_out_last;
 
     dmac_read # (
         .ADDR_WD(ADDR_WD),
@@ -134,20 +80,21 @@ module axi_dma_controller #(
     ) i_rd (
         .clk,
         .rst,
-        .rd_req_valid,
-        .rd_req_addr,
-        .rd_req_burst,
-        .rd_req_length,
-        .rd_req_size,
-        .rd_req_ack,
-        .rd_req_next_addr,
-        .rd_req_next_length,
-        .rd_req_done,
-        .rd_resp_valid,
-        // .ctrl_out_valid(buf_ctrl_in_valid),
-        // .ctrl_out_dst_addr(buf_ctrl_in_dst_addr),
-        // .ctrl_out_rd_offset(buf_ctrl_in_rd_offset),
-        // .ctrl_out_length(buf_ctrl_in_length), // bytes
+        // DMA Command
+        .cmd_valid,
+        .cmd_ready,
+        .cmd_src_addr,
+        .cmd_dst_addr,
+        .cmd_burst,
+        .cmd_len,
+        .cmd_size,
+        .cmd_out_valid(buf_cmd_in_valid),
+        .cmd_out_ready(buf_cmd_in_ready),
+        .cmd_out_src_offset(buf_cmd_in_src_offset),
+        .cmd_out_dst_addr(buf_cmd_in_dst_addr),
+        .cmd_out_burst(buf_cmd_in_burst),
+        .cmd_out_len(buf_cmd_in_len),
+        .cmd_out_size(buf_cmd_in_size),
         .data_out_valid(buf_data_in_valid),
         .data_out_ready(buf_data_in_ready),
         .data_out(buf_data_in),
@@ -174,13 +121,24 @@ module axi_dma_controller #(
     ) i_buf(
         .clk,
         .rst,
-        .dec_usage_valid(buf_dec_usage_valid),
-        .dec_usage_count(buf_dec_usage_count),
-        .buf_usage,
+        .cmd_in_valid(buf_cmd_in_valid),
+        .cmd_in_ready(buf_cmd_in_ready),
+        .cmd_in_src_offset(buf_cmd_in_src_offset),
+        .cmd_in_dst_addr(buf_cmd_in_dst_addr),
+        .cmd_in_burst(buf_cmd_in_burst),
+        .cmd_in_len(buf_cmd_in_len),
+        .cmd_in_size(buf_cmd_in_size),
         .data_in_valid(buf_data_in_valid),
         .data_in_ready(buf_data_in_ready),
         .data_in(buf_data_in),
         .data_in_last(buf_data_in_last),
+        .cmd_out_valid(buf_cmd_out_valid),
+        .cmd_out_ready(buf_cmd_out_ready),
+        .cmd_out_src_offset(buf_cmd_out_src_offset),
+        .cmd_out_dst_addr(buf_cmd_out_dst_addr),
+        .cmd_out_burst(buf_cmd_out_burst),
+        .cmd_out_len(buf_cmd_out_len),
+        .cmd_out_size(buf_cmd_out_size),
         .data_out_valid(buf_data_out_valid),
         .data_out_ready(buf_data_out_ready),
         .data_out(buf_data_out),
@@ -195,21 +153,17 @@ module axi_dma_controller #(
     ) i_wr (
         .clk,
         .rst,
-        .wr_req_valid,
-        .wr_req_addr,
-        .wr_req_burst,
-        .wr_req_length,
-        .wr_req_data_offset,
-        .wr_req_size,
-        .wr_req_ack,
-        .wr_req_next_addr,
-        .wr_req_next_length,
-        .wr_req_done,
+        .cmd_in_valid(buf_cmd_out_valid),
+        .cmd_in_ready(buf_cmd_out_ready),
+        .cmd_in_src_offset(buf_cmd_out_src_offset),
+        .cmd_in_dst_addr(buf_cmd_out_dst_addr),
+        .cmd_in_burst(buf_cmd_out_burst),
+        .cmd_in_len(buf_cmd_out_len),
+        .cmd_in_size(buf_cmd_out_size),
         .data_in_valid(buf_data_out_valid),
         .data_in_ready(buf_data_out_ready),
         .data_in(buf_data_out),
-        .buf_dec_usage_valid,
-        .buf_dec_usage_count,
+        .data_in_last(buf_data_out_last),
         // Write Address Channel
         .m_axi_awvalid(M_AXI_AWVALID),
         .m_axi_awaddr(M_AXI_AWADDR),
