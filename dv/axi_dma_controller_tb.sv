@@ -101,7 +101,7 @@ module axi_dma_controller_tb # (
         axi4_resp.rd_resp.mon_mbx_out = scb.axi_rd_mbx;
         axi4_resp.wr_resp.mon_mbx_out = scb.axi_wr_mbx;
 
-        axi4_resp.rd_resp.random_data = 1;
+        axi4_resp.rd_resp.random_data = 0;
         fork
             // cmd_if_drv.drive();
             axi4_resp.drive();
@@ -127,10 +127,25 @@ module axi_dma_controller_tb # (
         );
     endtask : send_aligned_cmd
 
-    task automatic test_demo();
+    task automatic test_all();
+        axi4_resp.rd_resp.max_outstanding = 10;
         repeat (20) begin
-            send_aligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 3);
-            repeat ($urandom_range(0, $urandom_range(0, 9) > 8 ? 60 : 0)) @(posedge clk);
+            send_aligned_cmd(ADDR_WD_BYTES + 1);
+            // repeat ($urandom_range(0, $urandom_range(0, 9) > 8 ? 60 : 0)) @(posedge clk);
+        end
+        #20ns;
+        @(posedge clk);
+        test_aligned_throttling();
+        #20ns;
+        @(posedge clk);
+        test_unaligned();
+    endtask : test_all
+
+    task automatic test_demo();
+        axi4_resp.rd_resp.max_outstanding = 10;
+        repeat (20) begin
+            send_aligned_cmd(ADDR_WD_BYTES * 3 + 1);
+            // repeat ($urandom_range(0, $urandom_range(0, 9) > 8 ? 60 : 0)) @(posedge clk);
         end
         #20ns;
     endtask : test_demo
@@ -217,7 +232,7 @@ module axi_dma_controller_tb # (
     endtask : send_unaligned_cmd
 
     task automatic test_unaligned();
-        repeat (10) send_unaligned_cmd(MAX_BURST_LEN);
+        // repeat (10) send_unaligned_cmd(MAX_BURST_LEN);
         repeat (20) begin
             send_unaligned_cmd(MAX_BURST_LEN * ADDR_WD_BYTES * 2);
             repeat ($urandom_range(10, 60)) @(posedge clk);
@@ -228,7 +243,8 @@ module axi_dma_controller_tb # (
     initial begin
         @(posedge clk iff !rst);
         // TODO: 
-        test_demo();
+        test_all();
+        // test_demo();
         // test_aligned();
         // test_aligned_throttling();
         // test_narrow();

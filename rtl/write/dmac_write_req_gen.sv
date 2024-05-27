@@ -126,7 +126,6 @@ module dmac_write_req_gen # (
     assign wr_req_addr  = wr_req_addr_reg;
     assign wr_req_burst = wr_req_burst_reg;
     assign wr_req_len   = burst_len;
-    assign wr_req_len   = burst_len;
     assign wr_req_data_offset = wr_req_data_offset_reg;
     assign wr_req_size  = wr_req_size_reg;
 

@@ -133,13 +133,10 @@ package axi_dma_controller_dv_pkg;
         local task automatic drive_aw_channel();
             item_t axi_item;
             forever begin
-                // @(posedge axi_if.clk iff axi_if.awvalid)
-                if (!axi_if.awvalid) @(posedge axi_if.clk iff axi_if.awvalid);
-                repeat ($urandom_range(0, awready_throttling)) @(posedge axi_if.clk);
                 axi_item = get_trans_item(1);
-
                 axi_if.awready <= 1;
-                @(posedge axi_if.clk);
+
+                @(posedge axi_if.clk iff axi_if.awvalid);
 
                 axi_item.req_time = cycle;
                 axi_item.is_read = 0;
@@ -156,7 +153,8 @@ package axi_dma_controller_dv_pkg;
                 // $info("aw done");
                 incr_wr_queue_ptr(1);
 
-                @(posedge axi_if.clk); // wait awvalid
+                axi_if.awready <= 0;
+                repeat ($urandom_range(0, awready_throttling)) @(posedge axi_if.clk);
             end
         endtask : drive_aw_channel
 
@@ -256,7 +254,7 @@ package axi_dma_controller_dv_pkg;
 
             forever begin
                 forever begin
-                    if (rd_queue.size() >= max_outstanding) begin
+                    if (max_outstanding > 0 && rd_queue.size() >= max_outstanding) begin
                         axi_if.arready <= 0;
                         @(posedge axi_if.clk);
                     end else begin
@@ -274,7 +272,7 @@ package axi_dma_controller_dv_pkg;
                 axi_item.burst = axi_if.arburst;
                 axi_item.size = axi_if.arsize;
                 axi_item.trans = axi_if.arlen + 1;
-                axi_item.data_offset = axi_item.address & ((1 << axi_item.size) - 1);
+                axi_item.data_offset = (axi_item.address % (ADDR_WD / 8));
                 axi_item.data = new [axi_item.trans * (1 << axi_item.size)];
                 axi_item.length = axi_item.trans * (1 << axi_item.size) - axi_item.data_offset; // bytes
                 // $info("axi_item.data_offset = ", axi_item.data_offset, ", length = ", axi_item.length);
@@ -319,8 +317,9 @@ package axi_dma_controller_dv_pkg;
         local task automatic drive_resp_pkt(input item_t item);
             // int rvalid_delay;
             bit [DATA_WD-1:0] resp_data;
-            int narrow_offset = (item.address % (ADDR_WD / 8)) & ((1 << item.size) - 1);
-            int data_offset = item.data_offset;
+            int narrow_size = 1 << item.size;
+            int narrow_offset = item.data_offset & ~(narrow_size - 1);
+            int data_ptr = item.data_offset;
             int ret_offset;
             // $info("resp addr = 0x%08x", item.address);
             // $info("narrow_offset = ", narrow_offset);
@@ -339,13 +338,12 @@ package axi_dma_controller_dv_pkg;
 
                 resp_data = 0;
                 ret_offset = i == 0 ? item.data_offset : narrow_offset;
-                // $info("ret_offset: ", ret_offset, "data_offset: ", data_offset);
-                for (int j = 0; j < (1 << item.size)/*DATA_WD / 8*/; j++) begin
-                    resp_data[(ret_offset + j)*8+:8] = item.data[data_offset];
-                    data_offset++;
+                for (int j = ret_offset; j < (ret_offset & ~(narrow_size - 1)) + narrow_size; j++) begin
+                    resp_data[j*8+:8] = item.data[data_ptr];
+                    data_ptr++;
                 end
 
-                narrow_offset = (narrow_offset + (1 << item.size)) % (ADDR_WD / 8);
+                narrow_offset = (narrow_offset + narrow_size) % (ADDR_WD / 8);
 
                 axi_if.rvalid <= 1;
                 axi_if.rdata  <= resp_data;
@@ -426,8 +424,8 @@ package axi_dma_controller_dv_pkg;
             while (rd_remaining_len > 0) begin
                 axi_rd_mbx.get(axi_item);
                 check_burst_common(src_ptr, rd_remaining_len, cmd_item, axi_item);
-                for (int i = axi_item.data_offset; i < axi_item.length; i++) begin
-                    rdata_buf[rd_buf_ptr] = axi_item.data[i];
+                for (int i = 0; i < axi_item.length; i++) begin
+                    rdata_buf[rd_buf_ptr] = axi_item.data[i + axi_item.data_offset];
                     rd_buf_ptr++; // TODO: unaligned
                 end
             end

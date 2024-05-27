@@ -50,7 +50,7 @@ module dmac_write_initiator # (
         if (rst) begin
             wr_req_blocking <= 0;
         end else begin
-            if (wr_req_valid && !wr_req_blocking) begin
+            if (wr_req_valid && !wr_req_ready) begin
                 wr_req_blocking <= 1;
             end else if (wr_req_ready) begin
                 wr_req_blocking <= 0;
@@ -76,6 +76,7 @@ module dmac_write_initiator # (
     logic               data_in_q_valid;
     logic [DATA_WD-1:0] data_in_q;
     logic [$clog2(ADDR_WD/8):0] data_shift_bytes;
+    logic [$clog2(ADDR_WD/8):0] data_shift_bytes_reg;
 
     wire  wr_delay = wr_req_data_offset > wr_req_addr[$clog2(ADDR_WD/8)-1:0]; // TODO: reg
     logic wr_delay_reg;
@@ -97,6 +98,16 @@ module dmac_write_initiator # (
             end
             if (data_in_valid && data_in_ready) begin
                 data_in_q <= data_in;
+            end
+        end
+    end
+
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst) begin
+            data_shift_bytes_reg <= 'x;
+        end else begin
+            if (wr_req_valid && !wr_req_blocking) begin
+                data_shift_bytes_reg <= data_shift_bytes;
             end
         end
     end
@@ -207,7 +218,7 @@ module dmac_write_initiator # (
     end
     always_ff @(posedge clk) begin
         if (data_in_valid && data_in_ready) begin
-            m_axi_wdata <= {data_in, data_in_q} >> (data_shift_bytes * 8);
+            m_axi_wdata <= {data_in, data_in_q} >> ({3'b0, data_shift_bytes_reg} << 3);
         end
     end
 
